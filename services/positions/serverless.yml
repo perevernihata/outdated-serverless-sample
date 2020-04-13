@@ -1,0 +1,110 @@
+service: positionsService
+plugins:
+  - serverless-webpack
+  - serverless-domain-manager 
+custom:
+  webpackIncludeModules: true    
+  customDomain: 
+    domainName: ${file(../../devops/configs/${opt:stage, 'development'}.config.json):RootApiUrl} 
+    basePath: 'positions'
+    stage: ${opt:stage, 'development'} 
+    createRoute53Record: true 
+    endpointType: 'regional' 
+provider:
+  name: aws
+  runtime: nodejs8.10
+  memorySize: 256
+  stage: ${opt:stage, 'development'}
+  region: ap-southeast-2
+  endpointType: regional 
+  iamRoleStatements: ${file(../../devops/dynamoIamRole.yaml)}
+  environment: ${file(../../devops/environmentVariables.yaml)}
+
+functions:
+  getPosition:
+    handler: handlers/getPosition.handler
+    events:
+      - http:
+          path: /{id}
+          method: get
+          cors: true
+          integration: lambda
+          response: ${file(../../devops/eventResponse.yaml)}
+          authorizer: ${file(../../devops/eventAuthorizer.yaml)}
+  createPosition:
+    handler: handlers/createPosition.handler
+    events:
+      - http:
+          path: /
+          method: post
+          cors: true
+          integration: lambda
+          response: ${file(../../devops/eventResponse.yaml)}
+          authorizer: ${file(../../devops/eventAuthorizer.yaml)}
+  updatePosition:
+    handler: handlers/updatePosition.handler
+    events:
+      - http:
+          path: /{id}
+          method: put
+          cors: true
+          integration: lambda
+          response: ${file(../../devops/eventResponse.yaml)}
+          authorizer: ${file(../../devops/eventAuthorizer.yaml)}
+  archivePosition:
+    handler: handlers/archivePosition.handler
+    events:
+      - http:
+          path: /{id}
+          method: delete
+          cors: true
+          integration: lambda
+          response: ${file(../../devops/eventResponse.yaml)}
+          authorizer: ${file(../../devops/eventAuthorizer.yaml)}
+  getCompanyPositions:
+    handler: handlers/getCompanyPositions.handler
+    events:
+      - http:
+          path: /company/{companyId}
+          method: get
+          cors: true
+          integration: lambda
+          response: ${file(../../devops/eventResponse.yaml)}
+          authorizer: ${file(../../devops/eventAuthorizer.yaml)}
+resources:
+  Resources:
+    DDBTable:
+      Type: "AWS::DynamoDB::Table"
+      Properties:
+        TableName: ${file(../../devops/configs/${opt:stage, 'development'}.config.json):PositionsTable}
+        AttributeDefinitions:
+          -
+            AttributeName: "positionId"
+            AttributeType: "S"
+          -
+            AttributeName: "tenantId"
+            AttributeType: "S"
+          - 
+            AttributeName: "companyId"
+            AttributeType: "S"            
+        KeySchema:
+          -
+            AttributeName: "tenantId"
+            KeyType: "HASH"
+          -
+            AttributeName: "positionId"
+            KeyType: "RANGE"
+        LocalSecondaryIndexes:
+          - IndexName: "CompanyIndex"
+            KeySchema:
+              -
+                AttributeName: "tenantId"
+                KeyType: "HASH"
+              - 
+                AttributeName: "companyId"
+                KeyType: "RANGE"
+            Projection:
+              ProjectionType: "KEYS_ONLY"            
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1

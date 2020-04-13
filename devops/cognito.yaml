@@ -1,0 +1,91 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Cognito aditum stack
+Parameters:
+  AuthName:
+    Type: String
+    Description: Unique Auth Name for Cognito Resources, ex. aditum
+  Env:
+    Type: String
+    Description: Unique Environment Name for Cognito Resources, ex. dev
+
+Resources:
+
+  # Creates Lambda pre signUp trigger function and execution role
+  PreSignUpLambda:
+    Type: "AWS::Lambda::Function"
+    Properties: 
+      Code:
+        ZipFile: >
+          var response = require('cfn-response');
+          exports.handler = function(event, context) {
+            event.response.autoConfirmUser = true;
+            context.done(null, event);
+          };
+      FunctionName: !Sub ${AuthName}-${Env}-presignup
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: nodejs6.10
+  LambdaExecutionRole:
+    Type: "AWS::IAM::Role"
+    Properties: 
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # Creates a user pool in cognito for your app to auth against
+  UserPool:
+    Type: "AWS::Cognito::UserPool"
+    Properties:
+      UserPoolName: !Sub ${AuthName}-${Env}-user-pool
+      LambdaConfig:
+        PreSignUp: !GetAtt PreSignUpLambda.Arn
+      AutoVerifiedAttributes:
+        - email
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Mutable: false
+          Required: true
+        - Name: agencyId
+          AttributeDataType: String
+          Mutable: true
+  
+  # Creates a User Pool Client to be used by the identity pool
+  UserPoolClient:
+    Type: "AWS::Cognito::UserPoolClient"
+    Properties:
+      ClientName: !Sub ${AuthName}-client
+      ExplicitAuthFlows:
+        - USER_PASSWORD_AUTH
+      GenerateSecret: false
+      ReadAttributes:
+        - email
+        - name
+        - custom:agencyId
+      UserPoolId: !Ref UserPool
+      WriteAttributes:
+        - email
+        - name
+        - custom:agencyId
+
+  LambdaInvocationPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt PreSignUpLambda.Arn
+      Principal: cognito-idp.amazonaws.com
+      SourceArn: !GetAtt UserPool.Arn
+
+Outputs:
+  UserPoolId:
+    Value: !Ref UserPool
+  UserPoolClientId:
+    Value: !Ref UserPoolClient

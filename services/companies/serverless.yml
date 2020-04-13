@@ -1,0 +1,75 @@
+service: companiesService
+plugins:
+  - serverless-webpack
+  - serverless-domain-manager 
+custom:
+  webpackIncludeModules: true    
+  customDomain: 
+    domainName: ${file(../../devops/configs/${opt:stage, 'development'}.config.json):RootApiUrl} 
+    basePath: 'companies'
+    stage: ${opt:stage, 'development'} 
+    createRoute53Record: true 
+    endpointType: 'regional' 
+provider:
+  name: aws
+  runtime: nodejs8.10
+  memorySize: 256
+  stage: ${opt:stage, 'development'}
+  region: ap-southeast-2
+  endpointType: regional 
+  iamRoleStatements: ${file(../../devops/dynamoIamRole.yaml)}
+  environment: ${file(../../devops/environmentVariables.yaml)}
+functions:
+  createCompany:
+    handler: handlers/createCompany.handler
+    events:
+      - http:
+          path: /
+          method: post
+          cors: true
+          integration: lambda
+          response: ${file(../../devops/eventResponse.yaml)}
+          authorizer: ${file(../../devops/eventAuthorizer.yaml)}
+  updateCompany:
+    handler: handlers/updateCompany.handler
+    events:
+      - http:
+          path: /{id}
+          method: put
+          cors: true
+          integration: lambda
+          response: ${file(../../devops/eventResponse.yaml)}
+          authorizer: ${file(../../devops/eventAuthorizer.yaml)}
+  getCompanies:
+    handler: handlers/getCompanies.handler
+    events:
+      - http:
+          path: /
+          method: get
+          cors: true
+          integration: lambda
+          response: ${file(../../devops/eventResponse.yaml)}
+          authorizer: ${file(../../devops/eventAuthorizer.yaml)}
+resources:
+  Resources:
+    DDBTable:
+      Type: "AWS::DynamoDB::Table"
+      Properties:
+        TableName: ${file(../../devops/configs/${opt:stage, 'development'}.config.json):CompaniesTable}
+        AttributeDefinitions:
+          -
+            AttributeName: "companyId"
+            AttributeType: "S"
+          -
+            AttributeName: "tenantId"
+            AttributeType: "S"
+        KeySchema:
+          -
+            AttributeName: "tenantId"
+            KeyType: "HASH"
+          -
+            AttributeName: "companyId"
+            KeyType: "RANGE"
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1

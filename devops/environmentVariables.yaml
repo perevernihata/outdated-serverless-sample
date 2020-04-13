@@ -1,0 +1,4 @@
+POSITIONS_TABLE: ${file(../../devops/configs/${opt:stage, 'development'}.config.json):PositionsTable}
+COMPANIES_TABLE: ${file(../../devops/configs/${opt:stage, 'development'}.config.json):CompaniesTable}
+CANDIDATES_TABLE: ${file(../../devops/configs/${opt:stage, 'development'}.config.json):CandidatesTable}
+BUCKET_NAME: ${file(../../devops/configs/${opt:stage, 'development'}.config.json):BucketName}

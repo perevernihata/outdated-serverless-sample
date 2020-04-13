@@ -1,0 +1,4 @@
+  arn: ${file(../../devops/configs/${opt:stage, 'development'}.config.json):CongnitoARN}
+  claims:
+    - email
+    - custom:agencyId

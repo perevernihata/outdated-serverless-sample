@@ -1,0 +1,84 @@
+# TODO: Manual changes are required to make service working, see https://github.com/serverless/serverless/issues/4628 for details
+service: documentService
+plugins:
+  - serverless-webpack
+  - serverless-domain-manager
+  - serverless-apigw-binary
+custom:
+  webpackIncludeModules: true   
+  customDomain:
+    domainName: ${file(../../devops/configs/${opt:stage, 'development'}.config.json):RootApiUrl}
+    basePath: 'documents'
+    stage: ${opt:stage, 'development'}
+    createRoute53Record: true
+    endpointType: 'regional'
+  apigwBinary:
+    types:           #list of mime-types 
+      - 'multipart/form-data'
+provider:
+  name: aws
+  runtime: nodejs6.10
+  memorySize: 256
+  stage: ${opt:stage, 'development'}
+  region: ap-southeast-2
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - s3:*
+      Resource:
+        Fn::Join:
+          - ""
+          - - "arn:aws:s3:::"
+            - Ref: UploadBucket
+            - "/*"
+functions:
+  getDocument:
+    handler: handlers/getDocument.handler
+    environment: ${file(../../devops/environmentVariables.yaml)}
+    events:
+      - http:
+          path: /{key}
+          method: get
+          cors: true
+          integration: lambda
+          request:
+            template:
+              application/json: ${file(./mapping-templates/decode-document)}
+          response: ${file(../../devops/eventResponse.yaml)}
+          authorizer: ${file(../../devops/eventAuthorizer.yaml)}
+  uploadDocuments:
+    handler: handlers/uploadDocuments.handler
+    environment: ${file(../../devops/environmentVariables.yaml)}
+    events:
+      - http:
+          path: /
+          method: post
+          cors: true
+          integration: lambda
+          request:
+            passThrough: WHEN_NO_TEMPLATES
+            template:
+              multipart/form-data: ${file(./mapping-templates/upload-documents)}
+          response: ${file(../../devops/eventResponse.yaml)}
+          authorizer: ${file(../../devops/eventAuthorizer.yaml)}
+  deleteDocument:
+    handler: handlers/deleteDocument.handler
+    environment: ${file(../../devops/environmentVariables.yaml)}
+    events:
+      - http:
+          path: /{key}
+          method: delete
+          cors: true
+          integration: lambda
+          request:
+            template:
+              application/json: ${file(./mapping-templates/decode-document)}
+          response: ${file(../../devops/eventResponse.yaml)}
+          authorizer: ${file(../../devops/eventAuthorizer.yaml)}
+resources:
+  Resources:
+    UploadBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${file(../../devops/configs/${opt:stage, 'development'}.config.json):BucketName}
+        AccessControl: Private
