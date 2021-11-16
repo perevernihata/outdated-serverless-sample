@@ -21,7 +21,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "aws-sdk": "^2.202.0",
+    "aws-sdk": "^2.814.0",
     "babel-runtime": "^6.26.0",
     "dynamodb-update-expression": "^0.1.21",
     "uuid": "^3.2.1"
